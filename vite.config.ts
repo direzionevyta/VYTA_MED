@@ -4,5 +4,5 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [VitePWA({ registerType: 'autoUpdate', manifest: { name: 'Soccorso Stadio', short_name: 'Soccorso', start_url: '/', display: 'standalone', background_color: '#0f172a', theme_color: '#0f172a', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }] }, workbox: { navigateFallback: '/index.html' } }), react()],
+  plugins: [VitePWA({ registerType: 'autoUpdate', manifest: { name: 'VYTA MED', short_name: 'VYTA', lang: 'it', start_url: '/', display: 'standalone', background_color: '#142432', theme_color: '#142432', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }, { src: '/apple-touch-icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' }] }, workbox: { navigateFallback: '/index.html' } }), react()],
 })

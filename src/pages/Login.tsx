@@ -76,7 +76,7 @@ export default function Login() {
 
   return (
     <div className="login">
-      <h1>Soccorso Stadio</h1>
+      <div className="login-brand"><img src="/icon.svg" alt="" /><h1>VYTA MED</h1></div>
       {forgotPassword ? <>
         <h2>Recupera la password</h2>
         {resetSent ? <p className="muted">Se l’indirizzo è associato a un account, riceverai un’email con il link per scegliere una nuova password.</p> : <>

@@ -40,7 +40,9 @@ label { color: #35465e; font-weight: 550; }
 label > input:not([type='checkbox']), label > select { margin-top: 5px; }
 
 .top { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px clamp(14px, 3vw, 34px); background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; box-shadow: 0 2px 12px rgba(20,38,63,.035); }
-.top > strong { font-family: Manrope, sans-serif; font-size: 1rem; letter-spacing: -.025em; color: var(--navy); white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.brand img { width: 34px; height: 34px; border-radius: 50%; }
+.brand strong { font-family: Manrope, sans-serif; font-size: 1rem; letter-spacing: -.025em; color: var(--navy); white-space: nowrap; }
 .nav { display: flex; gap: 5px; flex-wrap: nowrap; flex: 1; min-width: 240px; overflow-x: auto; scrollbar-width: thin; }
 .nav a { padding: 8px 11px; border-radius: 8px; text-decoration: none; white-space: nowrap; color: #52627a; font-size: .91rem; font-weight: 600; transition: background .16s, color .16s; }
 .nav a:hover { color: var(--blue-dark); background: #f3f7fc; }
@@ -65,6 +67,9 @@ p { line-height: 1.55; }
 .err { color: #bd2634; margin: 0; }
 
 .login { width: min(100% - 32px, 420px); margin: clamp(48px, 12vh, 120px) auto; padding: clamp(22px, 5vw, 34px); display: flex; flex-direction: column; gap: 13px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.login-brand img { width: 56px; height: 56px; border-radius: 50%; }
+.login-brand h1 { margin: 0; font-size: 1.7rem; }
 .login h2 { margin-bottom: 4px; }
 .login button { width: 100%; margin-top: 4px; }
 
@@ -212,7 +217,8 @@ label:has(input[type='checkbox']) { display: flex; align-items: center; gap: 8px
 }
 @media (max-width: 760px) {
   .top { gap: 8px; padding: 9px 12px 7px; }
-  .top > strong { width: calc(100% - 105px); font-size: .96rem; }
+  .top .brand { width: calc(100% - 105px); }
+  .brand strong { font-size: .96rem; }
   .who { display: none; }
   .event-switcher { order: 2; flex: 1 0 100%; min-width: 0; max-width: none; }
   .nav { order: 3; flex: 1 0 100%; min-width: 0; margin: 0 -2px; padding-bottom: 2px; }

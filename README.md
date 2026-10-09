@@ -1,4 +1,4 @@
-# Soccorso Stadio
+# VYTA MED
 
 Applicazione web installabile (PWA) per il coordinamento degli interventi sanitari negli stadi. Può lavorare offline dopo il primo accesso e la prima sincronizzazione; i dati locali sono cifrati e vengono inviati a Supabase quando torna la connessione.
 

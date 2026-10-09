@@ -157,7 +157,7 @@ function Shell() {
     <EventSelectionProvider role={profile.role} crewId={profile.crew_id} userId={profile.id}>
     <>
       <header className="top">
-        <strong>🚑 Soccorso Stadio</strong>
+        <div className="brand"><img src="/icon.svg" alt="" /><strong>VYTA MED</strong></div>
         <nav className="nav">
           {paths.map(p => <NavLink key={p} to={p} className={({ isActive }) => (isActive ? 'active' : '')}>{PAGES[p].label}</NavLink>)}
         </nav>
