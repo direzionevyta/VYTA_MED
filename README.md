@@ -24,8 +24,13 @@ In Supabase Auth, aggiungi il dominio Vercel scelto e `http://localhost:5173` ag
 ## Prima dell'uso con dati sanitari reali
 
 - Applicare e verificare le migrazioni SQL, inclusa `supabase/migrations/20261009_security_hardening.sql`, su un progetto Supabase di test prima del database operativo.
+- Applicare anche `supabase/migrations/20261012_security_privileges.sql` al progetto operativo corretto; la migrazione richiede che siano già state applicate le funzioni create nelle migrazioni precedenti.
 - Controllare le policy RLS effettive anche per le tabelle non definite dalle migrazioni presenti in questo repository.
 - Verificare separatamente il flusso offline, il ripristino password e la gestione delle modifiche in attesa di sincronizzazione.
 - Usare un progetto Supabase separato per le anteprime; non collegare le preview a dati sanitari reali.
+- In Supabase Auth, impostare una password minima di almeno 12 caratteri, abilitare MFA almeno per gli amministratori e limitare gli URL di redirect ai domini effettivamente usati.
+- Verificare la regione del database, gli accordi sul trattamento dati e i sub-responsabili di Supabase e Vercel; configurare accessi amministrativi individuali e rimuovere quelli non più necessari.
+- Definire con il referente privacy informativa, base giuridica, tempi di conservazione, procedure per le richieste degli interessati, DPIA e risposta alle violazioni prima di usare dati identificativi o sanitari.
+- Gestire i dispositivi con account individuali, blocco schermo, aggiornamenti e cancellazione remota; la modalità offline conserva dati cifrati nel browser finché vengono sincronizzati e l'utente esce.
 
 La configurazione Vercel non sostituisce la verifica di sicurezza, privacy e conformità necessaria per l'impiego sanitario.

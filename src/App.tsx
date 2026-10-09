@@ -113,7 +113,7 @@ function Shell() {
   const [resetDone, setResetDone] = useState(false)
   if (recovery && session) return <main>{resetDone ? <section className="form"><p className="eyebrow">SOCCORSO STADIO</p><h2>Password aggiornata</h2><p className="muted">Ora puoi accedere usando la nuova password.</p><button onClick={() => void signOut()}>Vai al login</button></section> : <form className="form" onSubmit={async e => {
     e.preventDefault()
-    if (newPassword.length < 8) return setResetMessage('La password deve contenere almeno 8 caratteri.')
+    if (newPassword.length < 12) return setResetMessage('La password deve contenere almeno 12 caratteri.')
     if (newPassword !== confirmPassword) return setResetMessage('Le password non coincidono.')
     setResetBusy(true); setResetMessage('')
     const queued = await db.outbox.count()
@@ -132,7 +132,7 @@ function Shell() {
     }
   }}>
     <p className="eyebrow">SOCCORSO STADIO</p><h2>Imposta una nuova password</h2>
-    <input type="password" autoComplete="new-password" placeholder="Nuova password (min. 8 caratteri)" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+    <input type="password" autoComplete="new-password" placeholder="Nuova password (min. 12 caratteri)" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
     <input type="password" autoComplete="new-password" placeholder="Conferma la nuova password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
     {resetMessage && <p className="muted">{resetMessage}</p>}
     <button disabled={resetBusy}>{resetBusy ? 'Aggiornamento…' : 'Salva nuova password'}</button>

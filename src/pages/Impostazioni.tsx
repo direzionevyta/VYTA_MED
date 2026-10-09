@@ -377,7 +377,7 @@ function Utenti() {
   const [search, setSearch] = useState('')
 
   const create = async () => {
-    if (!email || !name || pw.length < 8) return alert('Compila email, nome e password (minimo 8 caratteri)')
+    if (!email || !name || pw.length < 12) return alert('Compila email, nome e password (minimo 12 caratteri)')
     const assignedOrganization = profile?.is_platform_admin ? organizationId : profile?.organization_id
     if (!assignedOrganization) return alert('Seleziona un’organizzazione attiva prima di creare l’utente.')
     const { error } = await supabase.functions.invoke('admin-create-user', {
@@ -420,7 +420,7 @@ function Utenti() {
         <div className="grid2">
           <input placeholder="Nome e cognome" value={name} onChange={e => setName(e.target.value)} />
           <input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-          <input placeholder="Password iniziale (min. 8)" type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} />
+          <input placeholder="Password iniziale (min. 12)" type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} />
           <select value={role} onChange={e => setRole(e.target.value as Role)}>
             {(Object.keys(ROLE_LABEL) as Role[]).map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
           </select>
