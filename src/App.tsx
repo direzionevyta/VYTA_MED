@@ -21,6 +21,7 @@ import Impostazioni from './pages/Impostazioni'
 import Infermeria from './pages/Infermeria'
 import Schieramento from './pages/Schieramento'
 import { EventSelectionProvider, useEventSelection } from './lib/eventSelection'
+import { tenantBasePath } from './lib/tenant'
 
 const PAGES: Record<string, { label: string; el: ReactElement }> = {
   '/co': { label: 'Centrale', el: <CO /> },
@@ -147,6 +148,10 @@ function Shell() {
       </div>
     )
   }
+  const requestedTenant = tenantBasePath().replace(/^\//, '')
+  if (!profile.is_platform_admin && requestedTenant && profile.organization_slug && requestedTenant !== profile.organization_slug) {
+    return <main><div className="event-required"><strong>Link di un’altra organizzazione</strong><p>Questo indirizzo è dedicato a “{requestedTenant}”, ma l’account appartiene a “{profile.organization_slug}”. Accedi con l’account corretto o usa il link della tua organizzazione.</p></div></main>
+  }
   const paths = NAV[profile.role]
   return (
     <EventSelectionProvider role={profile.role} crewId={profile.crew_id} userId={profile.id}>
@@ -174,7 +179,7 @@ function Shell() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={tenantBasePath() || '/'}>
       <AuthProvider>
         <Shell />
       </AuthProvider>

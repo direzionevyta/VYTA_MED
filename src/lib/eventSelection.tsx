@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useActiveEvent } from './data'
+import { tenantBasePath } from './tenant'
 import type { Ev, Role } from './types'
 
 interface EventSelection {
@@ -18,7 +19,7 @@ export function EventSelectionProvider({ role, crewId, userId, children }: {
 }) {
   const query = useActiveEvent(role, crewId, userId)
   const events = query.data ?? []
-  const key = `selected-event:${userId}`
+  const key = `selected-event:${userId}:${tenantBasePath() || 'principale'}`
   const [selectedId, setSelectedId] = useState(() => localStorage.getItem(key) ?? '')
 
   useEffect(() => {

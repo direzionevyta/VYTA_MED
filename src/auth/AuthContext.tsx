@@ -67,8 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (current) setProfile(cp && cp.id === uid ? cp : null)
       } else {
         if (!current) return
-        setProfile((data as Profile | null) ?? null)
-        if (data) await writeLocalCache(uid, `profile:${uid}`, data)
+        const loaded = (data as Profile | null) ?? null
+        if (loaded?.organization_id) {
+          const { data: org } = await supabase.from('organizations').select('slug').eq('id', loaded.organization_id).maybeSingle()
+          if (org?.slug) loaded.organization_slug = org.slug as string
+        }
+        setProfile(loaded)
+        if (loaded) await writeLocalCache(uid, `profile:${uid}`, loaded)
       }
       if (current) setLoading(false)
     })

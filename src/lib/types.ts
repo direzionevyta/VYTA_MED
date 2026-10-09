@@ -5,8 +5,9 @@ export type Status =
   | 'in_trattamento' | 'in_trasporto' | 'concluso' | 'annullato'
 export type CrewStatus = 'disponibile' | 'impegnato' | 'non_disponibile'
 
-export interface Profile { id: string; email?: string | null; full_name: string; role: Role; crew_id: string | null; active: boolean }
-export interface Structure { id: string; name: string; map_image: string; active: boolean; created_at?: string }
+export interface Profile { id: string; email?: string | null; full_name: string; role: Role; crew_id: string | null; active: boolean; organization_id?: string | null; organization_slug?: string | null; is_platform_admin?: boolean }
+export interface Organization { id: string; name: string; slug: string; active: boolean; is_demo: boolean; created_at: string }
+export interface Structure { id: string; name: string; map_image: string; active: boolean; organization_id?: string | null; created_at?: string }
 export interface Zone { id: string; structure_id?: string | null; name: string; parent_id: string | null; kind: string | null; map_x: number | null; map_y: number | null; sort: number; active: boolean }
 export interface EventType { id: string; name: string; color: string; sort: number; active: boolean }
 export interface CrewType { id: string; name: string; active: boolean }

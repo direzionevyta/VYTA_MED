@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { useCached, useRefData } from '../lib/data'
 import { useEventSelection } from '../lib/eventSelection'
+import { tenantUrl } from '../lib/tenant'
 import { supabase } from '../lib/supabase'
 import type { EventPost } from '../lib/types'
 
@@ -106,7 +107,7 @@ export default function Schieramento() {
   </section>
 
   return <div className="deployment-page">
-    <div className="row deployment-title"><div><h2>Schieramento equipaggi</h2><p className="muted">Evento: <strong>{selectedEvent.name}</strong> · Struttura: <strong>{rd.structures.find(s => s.id === selectedEvent.structure_id)?.name ?? selectedEvent.venue ?? '—'}</strong></p></div><button className="ghost" onClick={() => window.open(`${window.location.origin}/schieramento?schermo=1`, '_blank', 'noopener,noreferrer')}>Apri vista TV ↗</button></div>
+    <div className="row deployment-title"><div><h2>Schieramento equipaggi</h2><p className="muted">Evento: <strong>{selectedEvent.name}</strong> · Struttura: <strong>{rd.structures.find(s => s.id === selectedEvent.structure_id)?.name ?? selectedEvent.venue ?? '—'}</strong></p></div><button className="ghost" onClick={() => window.open(tenantUrl('/schieramento?schermo=1'), '_blank', 'noopener,noreferrer')}>Apri vista TV ↗</button></div>
     {selectedEvent.status === 'preparazione' && <div className="deployment-preparing"><strong>Programmazione in anticipo</strong><span>Le assegnazioni sono salvate solo su questo evento. La vista TV mostra subito gli aggiornamenti.</span></div>}
     {canEdit && <form className="deployment-form" onSubmit={addPost}><label>Postazione / spazio<select required value={zoneId} onChange={e => setZoneId(e.target.value)}><option value="">Scegli uno spazio…</option>{activeZones.filter(z => !posts.some(p => p.zone_id === z.id)).map(z => <option key={z.id} value={z.id}>{rd.zoneLabel(z.id)}</option>)}</select></label><label>Equipaggio<select required value={crewId} onChange={e => setCrewId(e.target.value)}><option value="">Scegli un equipaggio…</option>{unassignedCrews.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><button disabled={saving || !zoneId || !crewId}>{saving ? 'Assegnazione…' : 'Assegna postazione'}</button></form>}
     {postsQuery.error && <p className="err">Impossibile caricare lo schieramento. Verifica di aver eseguito la migrazione SQL per le postazioni evento.</p>}

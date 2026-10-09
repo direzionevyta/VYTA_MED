@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@supabase/supabase-js'
 import { useAuth } from '../auth/AuthContext'
-import { all, useCached, useRefData } from '../lib/data'
+import { all, useActiveOrganizationId, useCached, useRefData } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL } from '../lib/types'
-import type { Ev, Profile, Role } from '../lib/types'
+import type { Crew, Ev, Organization, Profile, Role, Structure } from '../lib/types'
 import ZoneMap from '../components/ZoneMap'
 import { useEventSelection } from '../lib/eventSelection'
+import { organizationUrl, tenantBasePath } from '../lib/tenant'
 
-type Tab = 'strutture' | 'spazi' | 'eventi' | 'tipi_eq' | 'equipaggi' | 'utenti' | 'generale'
+type Tab = 'organizzazioni' | 'strutture' | 'spazi' | 'eventi' | 'tipi_eq' | 'equipaggi' | 'utenti' | 'generale'
 type Res = PromiseLike<{ error: { message: string } | null }>
 
 function useRun() {
@@ -113,18 +113,27 @@ function Spazi() {
 }
 
 function Strutture() {
+  const { profile } = useAuth()
+  const organizationId = useActiveOrganizationId()
   const rd = useRefData()
   const run = useRun()
   const [name, setName] = useState('')
+  const activeTenant = tenantBasePath().replace(/^\//, '') || profile?.organization_slug || 'organizzazione'
   return <div>
     <h3>Strutture e planimetrie</h3>
+    <p className="muted">Cliente attivo: <strong>{activeTenant}</strong></p>
     <p className="muted">Ogni struttura ha una planimetria e i propri spazi. Gli eventi restano collegati alla struttura scelta alla creazione.</p>
     <div className="toolbar"><input placeholder="Nome struttura / stadio" value={name} onChange={e => setName(e.target.value)} />
-      <button onClick={async () => {
+      <button disabled={organizationId.isLoading || !name.trim()} onClick={async () => {
         if (!name.trim()) return
-        await run(supabase.from('structures').insert({ name: name.trim(), map_image: '', active: true }), 'structures')
+        if (organizationId.isLoading) return alert('Attendi la verifica del cliente attivo.')
+        if (organizationId.error) return alert(`Non riesco a verificare il cliente: ${organizationId.error.message}`)
+        if (!organizationId.data) return alert(`Non trovo un’organizzazione attiva per “${activeTenant}”. Apri il link del cliente dalla sezione Clienti e riprova.`)
+        const { error } = await supabase.from('structures').insert({ name: name.trim(), map_image: '', active: true, organization_id: organizationId.data })
+        if (error) return alert(`Struttura non creata per “${activeTenant}”: ${error.message}`)
         setName('')
-      }}>Aggiungi struttura</button>
+        await run(Promise.resolve({ error: null }), 'structures')
+      }}>{organizationId.isLoading ? 'Verifica cliente…' : 'Aggiungi struttura'}</button>
     </div>
     <div className="cards">{rd.structures.map(s => <div className="card" key={s.id}>
       <div className="row"><strong>{s.name}</strong><span className="muted">{s.active ? 'Attiva' : 'Archiviata'}</span></div>
@@ -167,6 +176,7 @@ function Strutture() {
 }
 
 function TipiEvento() {
+  const organizationId = useActiveOrganizationId()
   const rd = useRefData()
   const run = useRun()
   const [name, setName] = useState('')
@@ -177,7 +187,7 @@ function TipiEvento() {
       <div className="toolbar">
         <input placeholder="Nome (es. Ustione)" value={name} onChange={e => setName(e.target.value)} />
         <input type="color" value={color} onChange={e => setColor(e.target.value)} />
-        <button onClick={async () => { if (!name.trim()) return; await run(supabase.from('event_types').insert({ name: name.trim(), color, sort: rd.types.length + 1 }), 'event_types'); setName('') }}>Aggiungi</button>
+        <button onClick={async () => { if (!name.trim() || !organizationId.data) return; await run(supabase.from('event_types').insert({ name: name.trim(), color, sort: rd.types.length + 1, organization_id: organizationId.data }), 'event_types'); setName('') }}>Aggiungi</button>
       </div>
       <div className="list">
         {rd.types.map(t => (
@@ -196,6 +206,7 @@ function TipiEvento() {
 }
 
 function TipiEquipaggio() {
+  const organizationId = useActiveOrganizationId()
   const rd = useRefData()
   const run = useRun()
   const [name, setName] = useState('')
@@ -204,7 +215,7 @@ function TipiEquipaggio() {
       <h3>Tipi di equipaggio</h3>
       <div className="toolbar">
         <input placeholder="Nome (es. Ambulanza, PMA)" value={name} onChange={e => setName(e.target.value)} />
-        <button onClick={async () => { if (!name.trim()) return; await run(supabase.from('crew_types').insert({ name: name.trim() }), 'crew_types'); setName('') }}>Aggiungi</button>
+        <button onClick={async () => { if (!name.trim() || !organizationId.data) return; await run(supabase.from('crew_types').insert({ name: name.trim(), organization_id: organizationId.data }), 'crew_types'); setName('') }}>Aggiungi</button>
       </div>
       <div className="list">
         {rd.crewTypes.map(t => (
@@ -282,10 +293,69 @@ function Equipaggi() {
   )
 }
 
+function Organizzazioni() {
+  const run = useRun()
+  const organizations = useCached<Organization[]>(['organizations'], () => all<Organization>('organizations', 'name'))
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [demo, setDemo] = useState(false)
+  const reservedSlugs = ['co', 'operatore', 'nuovo', 'equipaggi', 'schieramento', 'infermeria', 'archivio', 'impostazioni', 'assets', 'api']
+  const makeSlug = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const saveName = (value: string) => { setName(value); setSlug(makeSlug(value)) }
+  return <div>
+    <h3>Organizzazioni clienti</h3>
+    <p className="muted">Ogni organizzazione ha utenti e dati separati. Gli indirizzi personalizzati si collegheranno quando sarà configurato un dominio di proprietà.</p>
+    <div className="card">
+      <strong>Nuova organizzazione</strong>
+      <div className="toolbar">
+        <input placeholder="Nome cliente / organizzazione" value={name} onChange={e => saveName(e.target.value)} />
+        <input aria-label="Identificativo URL" placeholder="identificativo-url" value={slug} onChange={e => setSlug(makeSlug(e.target.value))} />
+        <label><input type="checkbox" checked={demo} onChange={e => setDemo(e.target.checked)} /> Ambiente demo</label>
+        <button onClick={async () => {
+          if (!name.trim() || !slug) return alert('Inserisci nome e identificativo.')
+          if (reservedSlugs.includes(slug)) return alert('Questo identificativo è riservato dall’app. Scegline un altro.')
+          const { error } = await supabase.from('organizations').insert({ name: name.trim(), slug, is_demo: demo })
+          if (error) return alert(error.message)
+          setName(''); setSlug(''); setDemo(false)
+          await run(Promise.resolve({ error: null }), 'organizations')
+        }}>Crea organizzazione</button>
+      </div>
+    </div>
+    <div className="list">{(organizations.data ?? []).map(org => <div className="rowline" key={org.id}>
+      <span><strong>{org.name}</strong> <small className="muted">· {org.slug} · {org.is_demo ? 'Demo' : 'Cliente'}</small> · <a href={organizationUrl(org.slug)}>{org.active ? 'Apri link' : 'Disattivata'}</a></span>
+      <button className="ghost" disabled={!org.active} onClick={() => { void navigator.clipboard.writeText(organizationUrl(org.slug)).then(() => alert('Link copiato.')) }}>{org.active ? 'Copia link' : 'Disattivata'}</button>
+      <button className="ghost" onClick={() => run(supabase.from('organizations').update({ active: !org.active }).eq('id', org.id), 'organizations')}>{org.active ? 'Disattiva' : 'Riattiva'}</button>
+      <button className="danger" disabled={org.slug === 'principale'} onClick={() => {
+        if (!window.confirm(`Vuoi eliminare definitivamente “${org.name}”? L’operazione è consentita solo se non ci sono utenti o dati collegati.`)) return
+        const confirmation = window.prompt(`Per confermare, scrivi l’identificativo: ${org.slug}`)
+        if (confirmation !== org.slug) return alert('Conferma non corrispondente. Organizzazione non eliminata.')
+        void (async () => {
+          const checks = await Promise.all([
+            supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('organization_id', org.id),
+            supabase.from('structures').select('id', { count: 'exact', head: true }).eq('organization_id', org.id),
+            supabase.from('event_types').select('id', { count: 'exact', head: true }).eq('organization_id', org.id),
+            supabase.from('crew_types').select('id', { count: 'exact', head: true }).eq('organization_id', org.id),
+            supabase.from('settings').select('key', { count: 'exact', head: true }).eq('organization_id', org.id),
+          ])
+          const failed = checks.find(result => result.error)
+          if (failed?.error) return alert(`Controllo non riuscito: ${failed.error.message}`)
+          if (checks.some(result => (result.count ?? 0) > 0)) return alert('Il cliente ha ancora utenti o dati collegati. Disattivalo per impedirne l’accesso; i dati verranno conservati.')
+          const { error } = await supabase.from('organizations').delete().eq('id', org.id)
+          if (error) return alert(error.message)
+          await run(Promise.resolve({ error: null }), 'organizations')
+        })()
+      }}>Elimina</button>
+    </div>)}</div>
+  </div>
+}
+
 function Utenti() {
-  const rd = useRefData()
+  const { profile } = useAuth()
   const run = useRun()
   const users = useCached<Profile[]>(['profiles'], () => all<Profile>('profiles', 'full_name'))
+  const organizations = useCached<Organization[]>(['organizations'], () => all<Organization>('organizations', 'name'))
+  const adminStructures = useCached<Structure[]>(['user-admin-structures'], () => all<Structure>('structures', 'name'))
+  const adminCrews = useCached<Crew[]>(['user-admin-crews'], () => all<Crew>('crews', 'name'))
   const events = useCached<Ev[]>(['events', 'all-admin'], () => all<Ev>('events', 'created_at', false))
   const assignments = useCached<{ user_id: string; event_id: string }[]>(['user_events'], () => all<{ user_id: string; event_id: string }>('user_events', 'event_id'))
   const [email, setEmail] = useState('')
@@ -293,17 +363,30 @@ function Utenti() {
   const [name, setName] = useState('')
   const [role, setRole] = useState<Role>('operatore')
   const [crew, setCrew] = useState('')
+  const [organizationId, setOrganizationId] = useState(profile?.organization_id ?? '')
+  const crewsForOrganization = (id: string) => {
+    const structureIds = new Set((adminStructures.data ?? []).filter(s => s.organization_id === id).map(s => s.id))
+    return (adminCrews.data ?? []).filter(c => !!c.structure_id && structureIds.has(c.structure_id))
+  }
   const [search, setSearch] = useState('')
 
   const create = async () => {
     if (!email || !name || pw.length < 8) return alert('Compila email, nome e password (minimo 8 caratteri)')
-    const tmp = createClient(import.meta.env.VITE_SUPABASE_URL as string, import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-      { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
-    const { data, error } = await tmp.auth.signUp({ email, password: pw, options: { data: { full_name: name } } })
-    if (error || !data.user) return alert(error?.message ?? 'Errore nella creazione')
-    await run(supabase.from('profiles').update({ role, crew_id: crew || null, full_name: name, email, active: true }).eq('id', data.user.id), 'profiles')
+    const assignedOrganization = profile?.is_platform_admin ? organizationId : profile?.organization_id
+    if (!assignedOrganization) return alert('Seleziona un’organizzazione attiva prima di creare l’utente.')
+    const { error } = await supabase.functions.invoke('admin-create-user', {
+      body: { email, password: pw, full_name: name, role, crew_id: crew || null, organization_id: assignedOrganization },
+    })
+    if (error) {
+      let detail = error.message
+      if ('context' in error && error.context instanceof Response) {
+        try { detail = (await error.context.clone().json()).error ?? detail } catch { /* Usa il messaggio standard. */ }
+      }
+      return alert(`Utente non creato: ${detail}. Verifica che la funzione di gestione utenti sia stata pubblicata.`)
+    }
+    await run(Promise.resolve({ error: null }), 'profiles')
     setEmail(''); setPw(''); setName('')
-    alert('Utente creato. Se non riesce ad accedere, disattiva "Confirm email" in Supabase → Authentication.')
+    alert('Utente creato e abilitato. Comunica le credenziali iniziali in modo sicuro.')
   }
 
   const setEventAccess = async (userId: string, eventId: string, checked: boolean) => {
@@ -317,7 +400,7 @@ function Utenti() {
   const sendPasswordReset = async (user: Profile) => {
     if (!user.email) return alert('Questo account non ha un’email registrata. Esegui la migrazione SQL e aggiorna il profilo.')
     if (!confirm(`Inviare a ${user.email} il link per scegliere una nuova password?`)) return
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: `${window.location.origin}/` })
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: window.location.origin })
     if (error) alert(error.message)
     else alert(`Link per il reset inviato a ${user.email}.`)
   }
@@ -337,8 +420,12 @@ function Utenti() {
           </select>
           <select value={crew} onChange={e => setCrew(e.target.value)}>
             <option value="">Nessun equipaggio</option>
-            {rd.crews.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {crewsForOrganization(organizationId).filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          {profile?.is_platform_admin && <select value={organizationId} onChange={e => setOrganizationId(e.target.value)} aria-label="Organizzazione">
+            <option value="">Organizzazione…</option>
+            {(organizations.data ?? []).filter(o => o.active).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>}
         </div>
         <button onClick={create}>Crea utente</button>
       </div>
@@ -346,31 +433,31 @@ function Utenti() {
       <div className="user-directory">
         {(users.data ?? []).filter(u => `${u.full_name} ${u.email ?? ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(u => (
           <article key={u.id} className={`user-card ${u.active ? '' : 'is-disabled'}`}>
-            <div className="user-card-heading"><div className="user-avatar" aria-hidden="true">{(u.full_name || '?').trim().charAt(0).toLocaleUpperCase()}</div><div className="user-identity"><strong>{u.full_name || '(senza nome)'}</strong><span>{u.email || 'Email non disponibile'}</span></div><span className={`user-state ${u.active ? 'enabled' : ''}`}>{u.active ? 'Attivo' : 'Disabilitato'}</span></div>
+            <div className="user-card-heading"><div className="user-avatar" aria-hidden="true">{(u.full_name || '?').trim().charAt(0).toLocaleUpperCase()}</div><div className="user-identity"><strong>{u.full_name || '(senza nome)'}</strong><span>{u.email || 'Email non disponibile'}{profile?.is_platform_admin ? ` · ${(organizations.data ?? []).find(o => o.id === u.organization_id)?.name ?? 'Senza organizzazione'}` : ''}</span></div><span className={`user-state ${u.active ? 'enabled' : ''}`}>{u.active ? 'Attivo' : 'Disabilitato'}</span></div>
             <div className="user-permissions">
-              <label>Ruolo<select value={u.role} onChange={e => run(supabase.from('profiles').update({ role: e.target.value }).eq('id', u.id), 'profiles')}>
+              <label>Ruolo<select value={u.role} disabled={u.id === profile?.id} onChange={e => run(supabase.from('profiles').update({ role: e.target.value }).eq('id', u.id), 'profiles')}>
                 {(Object.keys(ROLE_LABEL) as Role[]).map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
               </select></label>
-              <label>Equipaggio<select value={u.crew_id ?? ''} onChange={e => run(supabase.from('profiles').update({ crew_id: e.target.value || null }).eq('id', u.id), 'profiles')}>
+              <label>Equipaggio<select value={u.crew_id ?? ''} disabled={profile?.is_platform_admin && u.id === profile.id} onChange={e => run(supabase.from('profiles').update({ crew_id: e.target.value || null }).eq('id', u.id), 'profiles')}>
                 <option value="">Nessun equipaggio</option>
-                {rd.crews.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {crewsForOrganization(u.organization_id ?? '').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select></label>
             </div>
             <div className="user-card-actions">
               <details className="user-event-access">
                 <summary>Eventi assegnati <span className="count-badge">{(assignments.data ?? []).filter(a => a.user_id === u.id).length}</span></summary>
                 <div className="user-event-options">
-                  {(events.data ?? []).map(event => {
+                  {(events.data ?? []).filter(event => adminStructures.data?.some(s => s.id === event.structure_id && s.organization_id === u.organization_id)).map(event => {
                     const checked = (assignments.data ?? []).some(a => a.user_id === u.id && a.event_id === event.id)
                     return <label key={event.id}><input type="checkbox" checked={checked} onChange={e => void setEventAccess(u.id, event.id, e.target.checked)} />{event.name} <small>{event.status === 'in_corso' ? 'In corso' : event.status}</small></label>
                   })}
-                  {!(events.data ?? []).length && <small>Nessun evento disponibile</small>}
+                  {!(events.data ?? []).some(event => adminStructures.data?.some(s => s.id === event.structure_id && s.organization_id === u.organization_id)) && <small>Nessun evento disponibile</small>}
                 </div>
               </details>
               <div className="user-actions-row">
-                <button className="ghost" onClick={() => { const n = window.prompt('Nome', u.full_name); if (n) void run(supabase.from('profiles').update({ full_name: n }).eq('id', u.id), 'profiles') }}>Rinomina</button>
+                <button className="ghost" disabled={u.id === profile?.id} onClick={() => { const n = window.prompt('Nome', u.full_name); if (n) void run(supabase.from('profiles').update({ full_name: n }).eq('id', u.id), 'profiles') }}>Rinomina</button>
                 <button className="ghost" disabled={!u.email} onClick={() => void sendPasswordReset(u)}>Invia reset password</button>
-                <button className={u.active ? 'ghost' : ''} onClick={() => run(supabase.from('profiles').update({ active: !u.active }).eq('id', u.id), 'profiles')}>{u.active ? 'Disabilita' : 'Riattiva account'}</button>
+                <button className={u.active ? 'ghost' : ''} disabled={u.id === profile?.id} onClick={() => run(supabase.from('profiles').update({ active: !u.active }).eq('id', u.id), 'profiles')}>{u.active ? 'Disabilita' : 'Riattiva account'}</button>
               </div>
             </div>
           </article>
@@ -402,11 +489,12 @@ function toDataUrl(file: File, max = 1600): Promise<string> {
 }
 
 function Generale() {
+  const organizationId = useActiveOrganizationId()
   const rd = useRefData()
   const run = useRun()
   const [venue, setVenue] = useState(typeof rd.settings['venue'] === 'string' ? (rd.settings['venue'] as string) : '')
   const save = (key: string, value: unknown) =>
-    run(supabase.from('settings').upsert({ key, value, updated_at: new Date().toISOString() }), 'settings')
+    run(supabase.from('settings').upsert({ key, value, updated_at: new Date().toISOString(), organization_id: organizationId.data }), 'settings')
   return (
     <div>
       <h3>Generale</h3>
@@ -421,8 +509,10 @@ function Generale() {
 export default function Impostazioni() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
+  const isPlatformAdmin = !!profile?.is_platform_admin
   const [tab, setTab] = useState<Tab>('spazi')
   const tabs: [Tab, string, boolean][] = [
+    ['organizzazioni', 'Clienti', isPlatformAdmin],
     ['strutture', 'Strutture', isAdmin], ['spazi', 'Spazi', true], ['equipaggi', 'Equipaggi', true], ['tipi_eq', 'Tipi equipaggio', isAdmin],
     ['eventi', 'Tipi evento', isAdmin], ['utenti', 'Utenti', isAdmin], ['generale', 'Generale', isAdmin],
   ]
@@ -434,6 +524,7 @@ export default function Impostazioni() {
           <button key={k} className={tab === k ? '' : 'ghost'} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
+      {tab === 'organizzazioni' && isPlatformAdmin && <Organizzazioni />}
       {tab === 'spazi' && <Spazi />}
       {tab === 'strutture' && isAdmin && <Strutture />}
       {tab === 'equipaggi' && <Equipaggi />}
