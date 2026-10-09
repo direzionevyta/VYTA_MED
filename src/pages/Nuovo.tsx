@@ -11,6 +11,8 @@ export default function Nuovo() {
   const { profile, session } = useAuth()
   const nav = useNavigate()
   const selection = useEventSelection()
+  const selectedEvent = selection.selectedEvent
+  const rd = useRefData(selectedEvent?.structure_id)
   const [typeId, setTypeId] = useState('')
   const [zoneId, setZoneId] = useState('')
   const [showMap, setShowMap] = useState(false)
@@ -20,8 +22,6 @@ export default function Nuovo() {
 
   if (!profile || !session) return null
   if (selection.loading) return <p>Caricamento…</p>
-  const selectedEvent = selection.selectedEvent
-  const rd = useRefData(selectedEvent?.structure_id)
   if (!selectedEvent) return <p>{selection.events.length ? 'Scegli l’evento dal menu in alto prima di registrare un intervento.' : 'Nessun evento assegnato o in corso.'}</p>
   if (selectedEvent.status === 'preparazione') return <div className="event-required"><strong>Evento in programmazione</strong><p>La registrazione degli interventi sarà disponibile quando l’evento verrà avviato.</p><Link className="ghost-link" to="/schieramento">Vai allo schieramento</Link></div>
 

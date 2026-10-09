@@ -10,14 +10,21 @@ import { useEventSelection } from '../lib/eventSelection'
 import { organizationUrl, tenantBasePath } from '../lib/tenant'
 
 type Tab = 'organizzazioni' | 'strutture' | 'spazi' | 'eventi' | 'tipi_eq' | 'equipaggi' | 'utenti' | 'generale'
-type Res = PromiseLike<{ error: { message: string } | null }>
+type Res = PromiseLike<{ error: { message: string } | null; data?: unknown }> & {
+  select?: (columns?: string) => PromiseLike<{ error: { message: string } | null; data?: unknown }>
+}
 
 function useRun() {
   const qc = useQueryClient()
   return async (p: Res, key: string) => {
-    const { error } = await p
-    if (error) alert(error.message)
+    const result = await (p.select ? p.select('*') : p)
+    if (result.error) { alert(result.error.message); return false }
+    if (Array.isArray(result.data) && result.data.length === 0) {
+      alert('Nessuna riga modificata. Verifica i permessi del tuo account e riprova.')
+      return false
+    }
     await qc.invalidateQueries({ queryKey: [key] })
+    return true
   }
 }
 
@@ -53,8 +60,7 @@ function Spazi() {
         <button disabled={!structureId} onClick={async () => {
           if (!name.trim()) return
           if (!structureId) return alert('Seleziona prima una struttura.')
-          await run(supabase.from('zones').insert({ name: name.trim(), structure_id: structureId, parent_id: parent || null, kind, sort: rd.zones.length + 1 }), 'zones')
-          setName('')
+          if (await run(supabase.from('zones').insert({ name: name.trim(), structure_id: structureId, parent_id: parent || null, kind, sort: rd.zones.length + 1 }), 'zones')) setName('')
         }}>Aggiungi</button>
       </div>
       {rd.mapImage && (
@@ -187,7 +193,7 @@ function TipiEvento() {
       <div className="toolbar">
         <input placeholder="Nome (es. Ustione)" value={name} onChange={e => setName(e.target.value)} />
         <input type="color" value={color} onChange={e => setColor(e.target.value)} />
-        <button onClick={async () => { if (!name.trim() || !organizationId.data) return; await run(supabase.from('event_types').insert({ name: name.trim(), color, sort: rd.types.length + 1, organization_id: organizationId.data }), 'event_types'); setName('') }}>Aggiungi</button>
+        <button onClick={async () => { if (!name.trim() || !organizationId.data) return; if (await run(supabase.from('event_types').insert({ name: name.trim(), color, sort: rd.types.length + 1, organization_id: organizationId.data }), 'event_types')) setName('') }}>Aggiungi</button>
       </div>
       <div className="list">
         {rd.types.map(t => (
@@ -215,7 +221,7 @@ function TipiEquipaggio() {
       <h3>Tipi di equipaggio</h3>
       <div className="toolbar">
         <input placeholder="Nome (es. Ambulanza, PMA)" value={name} onChange={e => setName(e.target.value)} />
-        <button onClick={async () => { if (!name.trim() || !organizationId.data) return; await run(supabase.from('crew_types').insert({ name: name.trim(), organization_id: organizationId.data }), 'crew_types'); setName('') }}>Aggiungi</button>
+        <button onClick={async () => { if (!name.trim() || !organizationId.data) return; if (await run(supabase.from('crew_types').insert({ name: name.trim(), organization_id: organizationId.data }), 'crew_types')) setName('') }}>Aggiungi</button>
       </div>
       <div className="list">
         {rd.crewTypes.map(t => (
@@ -267,7 +273,7 @@ function Equipaggi() {
           {rd.crewTypes.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <input type="number" style={{ width: 80 }} value={members} onChange={e => setMembers(e.target.value)} />
-        <button onClick={async () => { if (!name.trim() || !structureId) return; await run(supabase.from('crews').insert({ name: name.trim(), structure_id: structureId, crew_type_id: type || null, members: Number(members) || 1 }), 'crews'); setName('') }}>Aggiungi</button>
+        <button onClick={async () => { if (!name.trim() || !structureId) return; if (await run(supabase.from('crews').insert({ name: name.trim(), structure_id: structureId, crew_type_id: type || null, members: Number(members) || 1 }), 'crews')) setName('') }}>Aggiungi</button>
       </div>
       <div className="list">
         {rd.crews.map(c => (

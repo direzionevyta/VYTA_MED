@@ -41,10 +41,16 @@ export async function flush() {
       }
       const res = it.kind === 'insert'
         ? await supabase.from(it.table).upsert({ id: it.id, ...payload }, { onConflict: 'id', ignoreDuplicates: true })
-        : await supabase.from(it.table).update(payload).eq('id', it.id)
+        : await supabase.from(it.table).update(payload).eq('id', it.id).select('id')
       const err = res.error
       if (err) {
         window.dispatchEvent(new CustomEvent('sync-error', { detail: err.message }))
+        break
+      }
+      if (it.kind === 'update' && (!Array.isArray(res.data) || res.data.length === 0)) {
+        window.dispatchEvent(new CustomEvent('sync-error', {
+          detail: 'Modifica non applicata: la riga non è accessibile o non esiste. La modifica resta in attesa di sincronizzazione.',
+        }))
         break
       }
       await db.outbox.delete(it.seq as number)
