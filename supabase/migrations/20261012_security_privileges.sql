@@ -25,3 +25,16 @@ revoke all on function public.record_event_activity() from public, anon, authent
 revoke all on function public.prevent_platform_admin_escalation() from public, anon, authenticated;
 revoke all on function public.prevent_intervention_identity_change() from public, anon, authenticated;
 revoke all on function public.prevent_non_status_crew_changes() from public, anon, authenticated;
+
+-- These legacy helpers are still used by signed-in authorization logic. Keep
+-- authenticated access, but do not expose them to anonymous API callers.
+revoke all on function public.app_crew() from public, anon;
+revoke all on function public.app_role() from public, anon;
+grant execute on function public.app_crew() to authenticated;
+grant execute on function public.app_role() to authenticated;
+
+-- Trigger entry points must never be callable as direct RPCs.
+revoke all on function public.guard_intervention() from public, anon, authenticated;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+revoke all on function public.log_intervention() from public, anon, authenticated;
+revoke all on function public.set_intervention_number() from public, anon, authenticated;
