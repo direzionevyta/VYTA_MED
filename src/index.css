@@ -53,6 +53,15 @@ label > input:not([type='checkbox']), label > select { margin-top: 5px; }
 .event-switcher select { width: 100%; min-width: 0; min-height: 38px; padding: 7px 10px; font-size: .85rem; }
 .pill { padding: 5px 10px; border-radius: 999px; font-size: .77rem; font-weight: 700; color: #fff; white-space: nowrap; }
 .pill.on { background: var(--green); } .pill.off { background: #c93743; }
+.sync-details { position: relative; }
+.sync-details > summary { cursor: pointer; list-style: none; }
+.sync-details > summary::-webkit-details-marker { display: none; }
+.sync-panel { position: absolute; top: calc(100% + 10px); right: 0; width: min(360px, calc(100vw - 28px)); padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: var(--shadow); z-index: 35; }
+.sync-panel p { margin: 8px 0; }
+.sync-panel ul { max-height: 190px; overflow: auto; padding-left: 18px; font-size: .84rem; }
+.sync-panel li { padding: 4px 0; }
+.sync-error, .sync-error-label { color: #a92330; }
+.sync-panel button { margin-top: 8px; }
 .toast { position: fixed; bottom: 14px; left: 14px; right: 14px; max-width: 680px; margin: 0 auto; background: #a92330; color: #fff; padding: 14px 16px; border-radius: 12px; z-index: 50; box-shadow: var(--shadow); cursor: pointer; }
 
 main { width: min(100% - 36px, 1440px); padding: 28px 0 48px; margin: 0 auto; }

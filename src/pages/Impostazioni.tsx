@@ -8,8 +8,10 @@ import type { Crew, Ev, Organization, Profile, Role, Structure } from '../lib/ty
 import ZoneMap from '../components/ZoneMap'
 import { useEventSelection } from '../lib/eventSelection'
 import { organizationUrl, tenantBasePath } from '../lib/tenant'
+import RegistroAttivita from './RegistroAttivita'
+import PrivacyDati from './PrivacyDati'
 
-type Tab = 'organizzazioni' | 'strutture' | 'spazi' | 'eventi' | 'tipi_eq' | 'equipaggi' | 'utenti' | 'generale'
+type Tab = 'organizzazioni' | 'strutture' | 'spazi' | 'eventi' | 'tipi_eq' | 'equipaggi' | 'utenti' | 'generale' | 'registro' | 'privacy'
 type Res = PromiseLike<{ error: { message: string } | null; data?: unknown }> & {
   select?: (columns?: string) => PromiseLike<{ error: { message: string } | null; data?: unknown }>
 }
@@ -590,6 +592,7 @@ export default function Impostazioni() {
     ['organizzazioni', 'Clienti', isPlatformAdmin],
     ['strutture', 'Strutture', isAdmin], ['spazi', 'Spazi', true], ['equipaggi', 'Equipaggi', true], ['tipi_eq', 'Tipi equipaggio', isAdmin],
     ['eventi', 'Tipi evento', isAdmin], ['utenti', 'Utenti', isAdmin], ['generale', 'Generale', isAdmin],
+    ['registro', 'Registro', isAdmin], ['privacy', 'Privacy e dati', isAdmin],
   ]
   return (
     <div>
@@ -607,6 +610,8 @@ export default function Impostazioni() {
       {tab === 'eventi' && isAdmin && <TipiEvento />}
       {tab === 'utenti' && isAdmin && <Utenti canManagePlatform={isPlatformAdmin} />}
       {tab === 'generale' && isAdmin && <Generale />}
+      {tab === 'registro' && isAdmin && <RegistroAttivita canManagePlatform={isPlatformAdmin} />}
+      {tab === 'privacy' && isAdmin && <PrivacyDati />}
     </div>
   )
 }

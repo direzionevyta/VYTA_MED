@@ -9,6 +9,10 @@ export interface OutboxItem {
   userId?: string
   payload: Record<string, unknown>
   at: number
+  lastAttemptAt?: number
+  nextRetryAt?: number
+  attemptCount?: number
+  syncError?: 'decrypt' | 'permission' | 'not_applied' | 'temporary'
 }
 export interface EncryptedValue { version: 1; iv: string; ciphertext: string }
 export interface StoredOutboxItem extends Omit<OutboxItem, 'payload'> {

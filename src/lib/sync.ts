@@ -20,7 +20,7 @@ export async function enqueue(item: Omit<OutboxItem, 'seq' | 'at' | 'userId'>) {
 }
 
 let running = false
-export async function flush() {
+export async function flush(force = false) {
   if (running || !navigator.onLine) return
   const { data: { session } } = await supabase.auth.getSession()
   const userId = session?.user.id
@@ -28,14 +28,19 @@ export async function flush() {
   running = true
   let did = false
   try {
-    const items = await db.outbox.where('userId').equals(userId).sortBy('seq')
+    const allItems = await db.outbox.where('userId').equals(userId).sortBy('seq')
+    const now = Date.now()
+    const items = allItems.filter(item => force || !item.nextRetryAt || item.nextRetryAt <= now)
     for (const it of items) {
       let payload: Record<string, unknown>
+      const attemptCount = (it.attemptCount ?? 0) + 1
+      await db.outbox.update(it.seq as number, { attemptCount, lastAttemptAt: now, syncError: undefined })
       try {
         payload = await decryptLocalValue<Record<string, unknown>>(userId, it.payload)
       } catch (err) {
+        await db.outbox.update(it.seq as number, { syncError: 'decrypt', nextRetryAt: Date.now() + 3_600_000 })
         window.dispatchEvent(new CustomEvent('sync-error', {
-          detail: err instanceof Error ? err.message : 'Impossibile decifrare una modifica offline.',
+          detail: 'Una modifica locale non può essere decifrata. È rimasta cifrata e in attesa; accedi con l’account che l’ha creata.',
         }))
         break
       }
@@ -44,12 +49,22 @@ export async function flush() {
         : await supabase.from(it.table).update(payload).eq('id', it.id).select('id')
       const err = res.error
       if (err) {
-        window.dispatchEvent(new CustomEvent('sync-error', { detail: err.message }))
+        const permission = err.code === '42501' || err.code?.startsWith('28') === true
+        const retryDelay = permission ? 3_600_000 : Math.min(30 * 60_000, 60_000 * 2 ** Math.min(attemptCount - 1, 5))
+        await db.outbox.update(it.seq as number, {
+          syncError: permission ? 'permission' : 'temporary', nextRetryAt: Date.now() + retryDelay,
+        })
+        window.dispatchEvent(new CustomEvent('sync-error', {
+          detail: permission
+            ? 'Il server ha rifiutato una modifica per mancanza di autorizzazione. La modifica cifrata è conservata; contatta l’amministratore.'
+            : 'Invio non riuscito. La modifica cifrata è conservata su questo dispositivo; puoi riprovare.',
+        }))
         break
       }
       if (it.kind === 'update' && (!Array.isArray(res.data) || res.data.length === 0)) {
+        await db.outbox.update(it.seq as number, { syncError: 'not_applied', nextRetryAt: Date.now() + 3_600_000 })
         window.dispatchEvent(new CustomEvent('sync-error', {
-          detail: 'Modifica non applicata: la riga non è accessibile o non esiste. La modifica resta in attesa di sincronizzazione.',
+          detail: 'Una modifica non è stata applicata. È conservata cifrata; verifica che l’account sia ancora abilitato.',
         }))
         break
       }
@@ -59,7 +74,10 @@ export async function flush() {
   } finally {
     running = false
   }
-  if (did) onSynced()
+  if (did) {
+    onSynced()
+    window.dispatchEvent(new CustomEvent('sync-complete', { detail: { at: Date.now() } }))
+  }
 }
 
 export function startSync() {

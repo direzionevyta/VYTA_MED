@@ -6,8 +6,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import { supabase } from './lib/supabase'
 import { db } from './lib/db'
+import type { StoredOutboxItem } from './lib/db'
 import { forgetLocalKey } from './lib/vault'
-import { setOnSynced, startSync } from './lib/sync'
+import { flush, setOnSynced, startSync } from './lib/sync'
 import { useOnline } from './lib/hooks'
 import type { Role } from './lib/types'
 import { ROLE_LABEL } from './lib/types'
@@ -43,16 +44,20 @@ function Live() {
   const { session } = useAuth()
   const online = useOnline()
   const userId = session?.user.id
-  const pending = useLiveQuery(
-    () => userId ? db.outbox.where('userId').equals(userId).count() : Promise.resolve(0),
+  const queued = useLiveQuery(
+    () => userId ? db.outbox.where('userId').equals(userId).toArray() : Promise.resolve([] as StoredOutboxItem[]),
     [userId],
-    0,
+    [] as StoredOutboxItem[],
   )
-  const otherPending = useLiveQuery(async () => {
-    const total = await db.outbox.count()
-    return Math.max(0, total - pending)
-  }, [userId, pending], 0)
   const [err, setErr] = useState('')
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
+  const pending = queued.length
+  const failed = queued.filter(item => !!item.syncError)
+
+  useEffect(() => {
+    setErr('')
+    setLastSyncedAt(null)
+  }, [userId])
 
   useEffect(() => {
     setOnSynced(() => { void qc.invalidateQueries() })
@@ -76,15 +81,37 @@ function Live() {
   useEffect(() => {
     const h = (e: Event) => setErr(String((e as CustomEvent).detail))
     window.addEventListener('sync-error', h)
-    return () => window.removeEventListener('sync-error', h)
+    const synced = (e: Event) => {
+      setErr('')
+      setLastSyncedAt(Number((e as CustomEvent<{ at: number }>).detail?.at) || Date.now())
+    }
+    window.addEventListener('sync-complete', synced)
+    return () => { window.removeEventListener('sync-error', h); window.removeEventListener('sync-complete', synced) }
   }, [])
+
+  const queueText = (item: StoredOutboxItem) => `${item.kind === 'insert' ? 'Nuova' : 'Modifica'} ${item.table === 'interventions' ? 'intervento' : 'equipaggio'} · ${new Date(item.at).toLocaleString('it-IT')}`
+  const errorText = (item: StoredOutboxItem) => ({
+    decrypt: 'Non decifrabile con questo account',
+    permission: 'Autorizzazione rifiutata',
+    not_applied: 'Modifica non applicata',
+    temporary: 'Invio non riuscito',
+  }[item.syncError ?? 'temporary'])
 
   return (
     <>
-      <span className={'pill ' + (online ? 'on' : 'off')}>
-        {online ? 'Online' : 'Offline'}{pending ? ` · ${pending} da inviare` : ''}
-        {otherPending ? ` · ${otherPending} per altri account` : ''}
-      </span>
+      <details className="sync-details">
+        <summary className={'pill ' + (!online ? 'off' : failed.length ? 'off' : 'on')}>
+          {online ? (failed.length ? 'Sync da verificare' : 'Online') : 'Offline'}{pending ? ` · ${pending} da inviare` : ''}
+        </summary>
+        <div className="sync-panel">
+          <strong>{!online ? 'Dispositivo offline' : failed.length ? 'Alcuni invii richiedono attenzione' : pending ? 'Sincronizzazione in corso' : 'Tutto aggiornato'}</strong>
+          <p className="muted">Le modifiche in attesa restano cifrate su questo dispositivo. Il riepilogo non mostra dati degli interventi.</p>
+          {err && <p className="sync-error">{err}</p>}
+          {pending > 0 && <ul>{queued.map(item => <li key={item.seq}>{queueText(item)}{item.syncError && <span className="sync-error-label"> · {errorText(item)} · tentativi: {item.attemptCount ?? 0}</span>}</li>)}</ul>}
+          {pending === 0 && lastSyncedAt && <small>Ultimo invio riuscito: {new Date(lastSyncedAt).toLocaleString('it-IT')}</small>}
+          <button className="ghost" disabled={!online || pending === 0} onClick={() => { setErr(''); void flush(true) }}>Riprova sincronizzazione</button>
+        </div>
+      </details>
       {err && <div className="toast" onClick={() => setErr('')}>Errore di sincronizzazione: {err} (tocca per chiudere)</div>}
     </>
   )

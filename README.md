@@ -34,3 +34,12 @@ In Supabase Auth, aggiungi il dominio Vercel scelto e `http://localhost:5173` ag
 - Gestire i dispositivi con account individuali, blocco schermo, aggiornamenti e cancellazione remota; la modalità offline conserva dati cifrati nel browser finché vengono sincronizzati e l'utente esce.
 
 La configurazione Vercel non sostituisce la verifica di sicurezza, privacy e conformità necessaria per l'impiego sanitario.
+
+## Controlli tecnici disponibili
+
+- **Registro amministrativo:** la migrazione `20261013_admin_audit.sql` registra chi ha creato, modificato o eliminato impostazioni e configurazioni, oltre alle esportazioni. Memorizza i nomi dei campi cambiati, non i loro valori né i dati clinici.
+- **Sincronizzazione offline:** il pannello in alto mostra solo il tipo e l'ora delle modifiche in attesa e un motivo sintetico dell'eventuale errore. Il contenuto resta cifrato nel browser; la cifratura locale non protegge un dispositivo già sbloccato o compromesso.
+- **Esportazione per organizzazione:** genera un archivio JSON cifrato con una password scelta dall'amministratore, separato per cliente attivo, e registra l'esportazione. La decifratura avviene localmente nel browser; l'eventuale JSON leggibile va protetto e cancellato dal dispositivo dopo l'uso.
+- **Conservazione:** l'amministratore può registrare, per ogni organizzazione, il periodo approvato e vedere gli eventi conclusi da sottoporre a revisione. Non è impostato un periodo predefinito e non parte alcuna cancellazione automatica: durata, base giuridica, eccezioni, copie offline e backup devono essere definite dal titolare con il referente privacy prima di cancellare dati.
+
+Questi controlli non rendono da soli il trattamento conforme al GDPR e non costituiscono una certificazione per dati sanitari. Prima dell'uso reale servono almeno: definizione documentata dei ruoli di titolare/responsabile, basi giuridiche ai sensi degli articoli 6 e 9, informativa, registro dei trattamenti, valutazione d'impatto quando richiesta, accordi con i fornitori e sub-responsabili, localizzazione/trasferimenti, tempi di conservazione e procedura per incidenti e diritti degli interessati. Le copie contenute nei backup dei fornitori e nei dispositivi offline seguono cicli distinti dalla cancellazione applicativa.
