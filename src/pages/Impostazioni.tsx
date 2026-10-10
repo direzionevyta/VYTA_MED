@@ -355,21 +355,89 @@ function Organizzazioni() {
   </div>
 }
 
-function Utenti() {
+function Utenti({ canManagePlatform }: { canManagePlatform: boolean }) {
   const { profile } = useAuth()
   const run = useRun()
-  const users = useCached<Profile[]>(['profiles'], () => all<Profile>('profiles', 'full_name'))
-  const organizations = useCached<Organization[]>(['organizations'], () => all<Organization>('organizations', 'name'))
-  const adminStructures = useCached<Structure[]>(['user-admin-structures'], () => all<Structure>('structures', 'name'))
-  const adminCrews = useCached<Crew[]>(['user-admin-crews'], () => all<Crew>('crews', 'name'))
-  const events = useCached<Ev[]>(['events', 'all-admin'], () => all<Ev>('events', 'created_at', false))
-  const assignments = useCached<{ user_id: string; event_id: string }[]>(['user_events'], () => all<{ user_id: string; event_id: string }>('user_events', 'event_id'))
+  const activeOrganization = useActiveOrganizationId()
+  const users = useCached<Profile[]>(['profiles', canManagePlatform ? 'all' : activeOrganization.data ?? 'none'], async () => {
+    let query = supabase.from('profiles').select('*').order('full_name')
+    if (!canManagePlatform) {
+      if (!activeOrganization.data) return []
+      query = query.eq('organization_id', activeOrganization.data)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []) as Profile[]
+  }, canManagePlatform || !!activeOrganization.data)
+  const organizations = useCached<Organization[]>(['organizations', canManagePlatform ? 'all' : activeOrganization.data ?? 'none'], async () => {
+    let query = supabase.from('organizations').select('*').order('name')
+    if (!canManagePlatform) {
+      if (!activeOrganization.data) return []
+      query = query.eq('id', activeOrganization.data)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []) as Organization[]
+  }, canManagePlatform || !!activeOrganization.data)
+  const adminStructures = useCached<Structure[]>(['user-admin-structures', canManagePlatform ? 'all' : activeOrganization.data ?? 'none'], async () => {
+    let query = supabase.from('structures').select('*').order('name')
+    if (!canManagePlatform) {
+      if (!activeOrganization.data) return []
+      query = query.eq('organization_id', activeOrganization.data)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []) as Structure[]
+  }, canManagePlatform || !!activeOrganization.data)
+  const adminCrews = useCached<Crew[]>(['user-admin-crews', canManagePlatform ? 'all' : activeOrganization.data ?? 'none'], async () => {
+    let query = supabase.from('crews').select('*').order('name')
+    if (!canManagePlatform) {
+      if (!activeOrganization.data) return []
+      const { data: structures, error: structureError } = await supabase.from('structures').select('id').eq('organization_id', activeOrganization.data)
+      if (structureError) throw structureError
+      const structureIds = (structures ?? []).map(s => s.id)
+      if (!structureIds.length) return []
+      query = query.in('structure_id', structureIds)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []) as Crew[]
+  }, canManagePlatform || !!activeOrganization.data)
+  const events = useCached<Ev[]>(['events', 'user-admin', canManagePlatform ? 'all' : activeOrganization.data ?? 'none'], async () => {
+    let query = supabase.from('events').select('*').order('created_at', { ascending: false })
+    if (!canManagePlatform) {
+      if (!activeOrganization.data) return []
+      const { data: structures, error: structureError } = await supabase.from('structures').select('id').eq('organization_id', activeOrganization.data)
+      if (structureError) throw structureError
+      const structureIds = (structures ?? []).map(s => s.id)
+      if (!structureIds.length) return []
+      query = query.in('structure_id', structureIds)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []) as Ev[]
+  }, canManagePlatform || !!activeOrganization.data)
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState<Role>('operatore')
   const [crew, setCrew] = useState('')
   const [organizationId, setOrganizationId] = useState(profile?.organization_id ?? '')
+  useEffect(() => {
+    if (activeOrganization.data) setOrganizationId(activeOrganization.data)
+  }, [activeOrganization.data])
+  const visibleUsers = (users.data ?? []).filter(u => canManagePlatform || u.organization_id === activeOrganization.data)
+  const assignments = useCached<{ user_id: string; event_id: string }[]>(['user_events', canManagePlatform ? 'all' : visibleUsers.map(u => u.id).sort().join(',')], async () => {
+    let query = supabase.from('user_events').select('*').order('event_id')
+    if (!canManagePlatform) {
+      const userIds = visibleUsers.map(u => u.id)
+      if (!userIds.length) return []
+      query = query.in('user_id', userIds)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []) as { user_id: string; event_id: string }[]
+  }, canManagePlatform || visibleUsers.length > 0)
   const crewsForOrganization = (id: string) => {
     const structureIds = new Set((adminStructures.data ?? []).filter(s => s.organization_id === id).map(s => s.id))
     return (adminCrews.data ?? []).filter(c => !!c.structure_id && structureIds.has(c.structure_id))
@@ -378,7 +446,7 @@ function Utenti() {
 
   const create = async () => {
     if (!email || !name || pw.length < 12) return alert('Compila email, nome e password (minimo 12 caratteri)')
-    const assignedOrganization = profile?.is_platform_admin ? organizationId : profile?.organization_id
+    const assignedOrganization = canManagePlatform ? organizationId : activeOrganization.data
     if (!assignedOrganization) return alert('Seleziona un’organizzazione attiva prima di creare l’utente.')
     const { error } = await supabase.functions.invoke('admin-create-user', {
       body: { email, password: pw, full_name: name, role, crew_id: crew || null, organization_id: assignedOrganization },
@@ -428,7 +496,7 @@ function Utenti() {
             <option value="">Nessun equipaggio</option>
             {crewsForOrganization(organizationId).filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          {profile?.is_platform_admin && <select value={organizationId} onChange={e => setOrganizationId(e.target.value)} aria-label="Organizzazione">
+          {canManagePlatform && <select value={organizationId} onChange={e => setOrganizationId(e.target.value)} aria-label="Organizzazione">
             <option value="">Organizzazione…</option>
             {(organizations.data ?? []).filter(o => o.active).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>}
@@ -437,9 +505,9 @@ function Utenti() {
       </div>
       <div className="user-directory-head"><div><h4>Utenti registrati</h4><p className="muted">Gestisci autorizzazioni, eventi e accesso agli account.</p></div><input aria-label="Cerca utente" placeholder="Cerca per nome o email…" value={search} onChange={e => setSearch(e.target.value)} /></div>
       <div className="user-directory">
-        {(users.data ?? []).filter(u => `${u.full_name} ${u.email ?? ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(u => (
+        {visibleUsers.filter(u => `${u.full_name} ${u.email ?? ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(u => (
           <article key={u.id} className={`user-card ${u.active ? '' : 'is-disabled'}`}>
-            <div className="user-card-heading"><div className="user-avatar" aria-hidden="true">{(u.full_name || '?').trim().charAt(0).toLocaleUpperCase()}</div><div className="user-identity"><strong>{u.full_name || '(senza nome)'}</strong><span>{u.email || 'Email non disponibile'}{profile?.is_platform_admin ? ` · ${(organizations.data ?? []).find(o => o.id === u.organization_id)?.name ?? 'Senza organizzazione'}` : ''}</span></div><span className={`user-state ${u.active ? 'enabled' : ''}`}>{u.active ? 'Attivo' : 'Disabilitato'}</span></div>
+            <div className="user-card-heading"><div className="user-avatar" aria-hidden="true">{(u.full_name || '?').trim().charAt(0).toLocaleUpperCase()}</div><div className="user-identity"><strong>{u.full_name || '(senza nome)'}</strong><span>{u.email || 'Email non disponibile'}{canManagePlatform ? ` · ${(organizations.data ?? []).find(o => o.id === u.organization_id)?.name ?? 'Senza organizzazione'}` : ''}</span></div><span className={`user-state ${u.active ? 'enabled' : ''}`}>{u.active ? 'Attivo' : 'Disabilitato'}</span></div>
             <div className="user-permissions">
               <label>Ruolo<select value={u.role} disabled={u.id === profile?.id} onChange={e => run(supabase.from('profiles').update({ role: e.target.value }).eq('id', u.id), 'profiles')}>
                 {(Object.keys(ROLE_LABEL) as Role[]).map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
@@ -514,8 +582,9 @@ function Generale() {
 
 export default function Impostazioni() {
   const { profile } = useAuth()
+  const activeTenant = tenantBasePath().replace(/^\//, '') || profile?.organization_slug || ''
   const isAdmin = profile?.role === 'admin'
-  const isPlatformAdmin = !!profile?.is_platform_admin
+  const isPlatformAdmin = !!profile?.is_platform_admin && activeTenant === 'principale'
   const [tab, setTab] = useState<Tab>('spazi')
   const tabs: [Tab, string, boolean][] = [
     ['organizzazioni', 'Clienti', isPlatformAdmin],
@@ -536,7 +605,7 @@ export default function Impostazioni() {
       {tab === 'equipaggi' && <Equipaggi />}
       {tab === 'tipi_eq' && isAdmin && <TipiEquipaggio />}
       {tab === 'eventi' && isAdmin && <TipiEvento />}
-      {tab === 'utenti' && isAdmin && <Utenti />}
+      {tab === 'utenti' && isAdmin && <Utenti canManagePlatform={isPlatformAdmin} />}
       {tab === 'generale' && isAdmin && <Generale />}
     </div>
   )
