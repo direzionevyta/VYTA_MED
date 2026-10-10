@@ -11,6 +11,13 @@ environment for the demo. Do not place production Supabase credentials in the
 demo project's environment variables. Do not copy production rows, backups,
 profiles, attachments, or offline exports into the demo.
 
+The current beta is deployed from the `codex/vyta-med-beta` branch as a
+protected Preview deployment of the existing `vyta-med` Vercel project. Vercel
+applies branch-specific Preview variables on that branch only; production
+variables and deployments remain unchanged. A separate Vercel project can be
+created when the Vercel integration is authorized to create projects under the
+`direzionevytas-projects` team.
+
 The isolated demo project was created as `VYTA MED Demo` (`yaxrifuumpkklmvzwbdz`)
 in the `VYTA_MED` organization, in the `eu-west-1` region on the Nano compute
 tier. The production project remains `gybbaaszywwktkjblpfj`.
@@ -31,7 +38,8 @@ against production.
 
 ## Vercel variables
 
-Set these only in the dedicated demo project/environment:
+Set these only in the dedicated demo project/environment or the beta branch's
+Preview environment:
 
 - `VITE_SUPABASE_URL`: URL of the demo Supabase project.
 - `VITE_SUPABASE_ANON_KEY`: publishable/anon key of the demo Supabase project.
@@ -66,7 +74,7 @@ enable paid usage because the deployment budget is €0.
 
 ## Before sharing the URL
 
-1. Confirm the Vercel demo project's build has the demo-only environment values.
+1. Confirm the Vercel demo project's or beta branch's build has the demo-only environment values.
 2. Confirm the demo Supabase project has no production records and the expected
    RLS policies are enabled.
 3. Create test accounts and synthetic event data, then try the main workflows.
