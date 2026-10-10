@@ -21,6 +21,10 @@ Imposta queste variabili nelle impostazioni del progetto Vercel, per **Preview**
 
 In Supabase Auth, aggiungi il dominio Vercel scelto e `http://localhost:5173` agli URL di redirect consentiti. Per il recupero password serve anche un servizio email configurato. Dopo aver scelto il dominio definitivo, aggiorna gli URL di redirect e il template email.
 
+## Ambiente demo
+
+La pagina dimostrativa è attivata solo con `VITE_DEMO_MODE=true`; mostra istruzioni d'accesso e un avviso permanente dopo il login. Per pubblicarla, usa un progetto Vercel e un progetto Supabase separati dalla produzione, con account invitati e dati esclusivamente fittizi. Segui [docs/DEMO_SETUP.md](docs/DEMO_SETUP.md): il database iniziale va riconciliato con lo schema completo prima di applicare le migrazioni a un nuovo progetto.
+
 ## Prima dell'uso con dati sanitari reali
 
 - Applicare e verificare le migrazioni SQL, inclusa `supabase/migrations/20261009_security_hardening.sql`, su un progetto Supabase di test prima del database operativo.
