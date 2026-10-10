@@ -21,8 +21,11 @@ import Archivio from './pages/Archivio'
 import Impostazioni from './pages/Impostazioni'
 import Infermeria from './pages/Infermeria'
 import Schieramento from './pages/Schieramento'
+import DemoWelcome from './pages/DemoWelcome'
 import { EventSelectionProvider, useEventSelection } from './lib/eventSelection'
 import { tenantBasePath } from './lib/tenant'
+
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 
 const PAGES: Record<string, { label: string; el: ReactElement }> = {
   '/co': { label: 'Centrale', el: <CO /> },
@@ -165,7 +168,7 @@ function Shell() {
     <button disabled={resetBusy}>{resetBusy ? 'Aggiornamento…' : 'Salva nuova password'}</button>
   </form>}</main>
   if (loading) return <p style={{ padding: 16 }}>Caricamento…</p>
-  if (!session) return <Login />
+  if (!session) return DEMO_MODE ? <DemoWelcome><Login /></DemoWelcome> : <Login />
   if (!vaultUnlocked) return <Login />
   if (!profile || !profile.active) {
     return (
@@ -175,6 +178,9 @@ function Shell() {
       </div>
     )
   }
+  if (DEMO_MODE && profile.organization_is_demo !== true) {
+    return <main><div className="event-required"><strong>Account non abilitato nell’ambiente demo</strong><p>Usa l’account demo della tua organizzazione. Questo ambiente accetta soltanto organizzazioni dimostrative.</p><button className="ghost" onClick={() => void signOut()}>Esci</button></div></main>
+  }
   const requestedTenant = tenantBasePath().replace(/^\//, '')
   if (!profile.is_platform_admin && requestedTenant && profile.organization_slug && requestedTenant !== profile.organization_slug) {
     return <main><div className="event-required"><strong>Link di un’altra organizzazione</strong><p>Questo indirizzo è dedicato a “{requestedTenant}”, ma l’account appartiene a “{profile.organization_slug}”. Accedi con l’account corretto o usa il link della tua organizzazione.</p></div></main>
@@ -183,6 +189,7 @@ function Shell() {
   return (
     <EventSelectionProvider role={profile.role} crewId={profile.crew_id} userId={profile.id}>
     <>
+      {DEMO_MODE && <div className="demo-safety-banner">AMBIENTE DIMOSTRATIVO · usa soltanto i dati fittizi predisposti</div>}
       <header className="top">
         <div className="brand"><img src="/icon.svg" alt="" /><strong>VYTA MED</strong></div>
         <nav className="nav">

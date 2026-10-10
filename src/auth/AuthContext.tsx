@@ -69,8 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!current) return
         const loaded = (data as Profile | null) ?? null
         if (loaded?.organization_id) {
-          const { data: org } = await supabase.from('organizations').select('slug').eq('id', loaded.organization_id).maybeSingle()
+          const { data: org } = await supabase.from('organizations').select('slug,is_demo').eq('id', loaded.organization_id).maybeSingle()
           if (org?.slug) loaded.organization_slug = org.slug as string
+          loaded.organization_is_demo = org?.is_demo === true
         }
         setProfile(loaded)
         if (loaded) await writeLocalCache(uid, `profile:${uid}`, loaded)
