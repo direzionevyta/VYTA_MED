@@ -20,6 +20,7 @@ export interface Intervention {
   first_name: string | null; last_name: string | null; age: number | null; sex: string | null
   triage: Triage | null; status: Status; crew_id: string | null; crew_ids?: string[]
   notes: string | null; outcome: string | null; destination: string | null
+  vital_signs?: Record<string, string | number | null> | null; treatments?: string | null; medications?: string | null
   created_by: string | null; created_at: string; updated_at: string; closed_at: string | null
   pending?: boolean
 }
