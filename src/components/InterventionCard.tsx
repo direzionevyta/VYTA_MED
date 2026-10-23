@@ -10,6 +10,7 @@ interface Props { i: Intervention; rd: RefData; all: Intervention[]; role: Role;
 const fromI = (x: Intervention) => ({
   first_name: x.first_name ?? '', last_name: x.last_name ?? '', age: x.age?.toString() ?? '', sex: x.sex ?? '',
   location_note: x.location_note ?? '', notes: x.notes ?? '', outcome: x.outcome ?? '', destination: x.destination ?? '',
+  pressure: String(x.vital_signs?.pressure ?? ''), pulse: String(x.vital_signs?.pulse ?? ''), spo2: String(x.vital_signs?.spo2 ?? ''), temperature: String(x.vital_signs?.temperature ?? ''), treatments: x.treatments ?? '', medications: x.medications ?? '',
 })
 
 export default function InterventionCard({ i, rd, all, role, ownCrew }: Props) {
@@ -31,6 +32,8 @@ export default function InterventionCard({ i, rd, all, role, ownCrew }: Props) {
       first_name: f.first_name || null, last_name: f.last_name || null, age: f.age ? Number(f.age) : null,
       sex: f.sex || null, location_note: f.location_note || null, notes: f.notes || null,
       outcome: f.outcome || null, destination: f.destination || null,
+      vital_signs: { pressure: f.pressure || null, pulse: f.pulse || null, spo2: f.spo2 || null, temperature: f.temperature || null },
+      treatments: f.treatments || null, medications: f.medications || null,
     })
     setOpen(false)
   }
@@ -102,6 +105,15 @@ export default function InterventionCard({ i, rd, all, role, ownCrew }: Props) {
           </div>
           <input placeholder="Dettaglio luogo (fila, posto, cancello…)" value={f.location_note} onChange={set('location_note')} />
           <textarea placeholder="Note cliniche / dinamica" rows={3} value={f.notes} onChange={set('notes')} />
+          <h4>Scheda clinica</h4>
+          <div className="grid2">
+            <input aria-label="Pressione arteriosa" placeholder="Pressione (es. 120/80)" value={f.pressure} onChange={set('pressure')} />
+            <input aria-label="Frequenza cardiaca" placeholder="Frequenza cardiaca (bpm)" type="number" value={f.pulse} onChange={set('pulse')} />
+            <input aria-label="Saturazione" placeholder="SpO₂ (%)" type="number" value={f.spo2} onChange={set('spo2')} />
+            <input aria-label="Temperatura" placeholder="Temperatura (°C)" type="number" step="0.1" value={f.temperature} onChange={set('temperature')} />
+          </div>
+          <textarea placeholder="Trattamenti effettuati" rows={2} value={f.treatments} onChange={set('treatments')} />
+          <textarea placeholder="Farmaci somministrati (nome, dose, ora)" rows={2} value={f.medications} onChange={set('medications')} />
           <div className="grid2">
             <input placeholder="Esito" value={f.outcome} onChange={set('outcome')} />
             <input placeholder="Destinazione (ospedale, PMA…)" value={f.destination} onChange={set('destination')} />
