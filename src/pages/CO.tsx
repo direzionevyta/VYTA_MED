@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
@@ -11,7 +11,7 @@ import CreateEventDialog from '../components/CreateEventDialog'
 import { useCached } from '../lib/data'
 import { supabase } from '../lib/supabase'
 import { STATUS_LABEL } from '../lib/types'
-import type { Intervention, Status } from '../lib/types'
+import type { EventPost, Intervention, Status } from '../lib/types'
 
 const RANK: Record<string, number> = { rosso: 4, giallo: 3, verde: 2, bianco: 1 }
 type Activity = { id: number; event_id: string; intervention_id: string | null; actor_label: string; action: string; details: Record<string, unknown>; created_at: string }
@@ -58,6 +58,37 @@ export default function CO() {
   const [filter, setFilter] = useState<'attivi' | 'tutti'>('attivi')
   const [zone, setZone] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [alarm, setAlarm] = useState(false)
+  const [message, setMessage] = useState('')
+  const posts = useCached<EventPost[]>(['event_posts', selectedEvent?.id ?? 'none'], async () => {
+    if (!selectedEvent?.id) return []
+    const { data, error } = await supabase.from('event_posts').select('*').eq('event_id', selectedEvent.id).order('post_number')
+    if (error) throw error
+    return (data ?? []) as EventPost[]
+  }, !!selectedEvent?.id)
+  const messages = useCached<{ id: string; body: string; sender_id: string; created_at: string }[]>(['event_messages', selectedEvent?.id ?? 'none'], async () => {
+    if (!selectedEvent?.id) return []
+    const { data, error } = await supabase.from('event_messages').select('*').eq('event_id', selectedEvent.id).order('created_at', { ascending: false }).limit(30)
+    if (error) throw error
+    return data ?? []
+  }, !!selectedEvent?.id)
+  useEffect(() => {
+    if (!alarm || !selectedEvent?.id) return
+    let seen = new Set<string>()
+    const ch = supabase.channel(`new-calls-${selectedEvent.id}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'interventions', filter: `event_id=eq.${selectedEvent.id}` }, payload => {
+      const row = payload.new as { id?: string }
+      if (!row.id || seen.has(row.id)) return
+      seen.add(row.id)
+      try {
+        const ctx = new AudioContext(); const osc = ctx.createOscillator(); const gain = ctx.createGain()
+        osc.frequency.value = 880; gain.gain.value = 0.12; osc.connect(gain); gain.connect(ctx.destination)
+        osc.onended = () => { void ctx.close() }; osc.start(); osc.stop(ctx.currentTime + 0.22)
+      } catch { /* audio may be unavailable on this device */ }
+      if ('Notification' in window && Notification.permission === 'granted') new Notification('Nuovo intervento', { body: `Evento: ${selectedEvent.name}` })
+      void qc.invalidateQueries({ queryKey: ['interventions', selectedEvent.id] })
+    }).subscribe()
+    return () => { void supabase.removeChannel(ch) }
+  }, [alarm, selectedEvent?.id, selectedEvent?.name, qc])
   if (!profile) return null
   const canEvent = profile.role === 'admin'
 
@@ -111,6 +142,31 @@ export default function CO() {
         <div className="ops-metric"><span>In infermeria</span><strong>{active.filter(i => i.status === 'in_trattamento').length}</strong></div>
         <div className="ops-metric"><span>In trasporto</span><strong>{active.filter(i => i.status === 'in_trasporto').length}</strong></div>
         <div className="ops-metric"><span>Equipaggi disponibili</span><strong>{availableCrews}</strong></div>
+      </section>
+      <div className="toolbar">
+        <button className={alarm ? '' : 'ghost'} onClick={async () => {
+          if (!alarm && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
+          setAlarm(!alarm)
+        }}>{alarm ? '🔔 Allarmi attivi' : 'Attiva allarme nuovi interventi'}</button>
+        <span className="muted">Aggiornamento in tempo reale · equipaggi assegnati o in postazione</span>
+      </div>
+      <section className="activity-panel">
+        <h3>Equipaggi sul campo</h3>
+        <div className="chips">{rd.crews.filter(c => c.active).map(c => {
+          const assignment = active.find(i => (i.crew_ids?.length ? i.crew_ids : i.crew_id ? [i.crew_id] : []).includes(c.id))
+          const post = posts.data?.find(p => p.crew_id === c.id)
+          return <span className="chip" key={c.id}>{c.name}: {assignment ? `Intervento #${assignment.number ?? '…'}` : post ? `Postazione ${rd.zoneLabel(post.zone_id)}` : c.status === 'disponibile' ? 'Disponibile' : 'Non disponibile'}</span>
+        })}</div>
+      </section>
+      <section className="activity-panel">
+        <h3>Messaggi operativi</h3>
+        <form className="toolbar" onSubmit={async e => {
+          e.preventDefault(); const body = message.trim(); if (!body) return
+          const { error } = await supabase.from('event_messages').insert({ event_id: selectedEvent.id, body })
+          if (error) { alert(error.message); return }
+          setMessage(''); await qc.invalidateQueries({ queryKey: ['event_messages', selectedEvent.id] })
+        }}><input aria-label="Messaggio" placeholder="Messaggio per gli equipaggi…" maxLength={2000} value={message} onChange={e => setMessage(e.target.value)} /><button disabled={!message.trim()}>Invia</button></form>
+        {messages.data?.length ? <ol className="activity-list">{messages.data.map(m => <li className="activity-item" key={m.id}><span className="activity-marker" /><div className="activity-copy"><strong>{m.body}</strong><span>{m.sender_id === profile.id ? 'Tu' : 'Equipaggio'} · {new Date(m.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span></div></li>)}</ol> : <p className="muted">Nessun messaggio.</p>}
       </section>
       <div className="chips">
         <span className="chip">In corso: {active.length}</span>
